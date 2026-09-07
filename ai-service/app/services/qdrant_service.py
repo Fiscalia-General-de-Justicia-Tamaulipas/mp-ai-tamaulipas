@@ -10,6 +10,9 @@ QDRANT_URL = os.getenv('QDRANT_URL', 'http://qdrant:6333')
 QDRANT_COLLECTION = os.getenv('QDRANT_COLLECTION', 'legal_articles')
 OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://ollama:11434')
 OLLAMA_EMBED_MODEL = os.getenv('OLLAMA_EMBED_MODEL', 'nomic-embed-text')
+ALLOW_MISSING_LEGAL_ARTICLES = os.getenv('MPIA_ALLOW_MISSING_LEGAL_ARTICLES', '').lower() in {
+    '1', 'true', 'yes', 'on'
+}
 
 
 def _database_connection():
@@ -89,6 +92,9 @@ def _articles_for_offense(offense_id: int, as_of_date: str | None = None) -> lis
 async def search_legal_articles(query: str, offense_id: int, limit: int = 5, as_of_date: str | None = None) -> list[str]:
     articles = _articles_for_offense(offense_id, as_of_date)
     if not articles:
+        if ALLOW_MISSING_LEGAL_ARTICLES:
+            return []
+
         raise RuntimeError(
             f'No hay artículos jurídicos verificados y vigentes para el delito {offense_id} '
             f'en la fecha {as_of_date or "actual"}.'

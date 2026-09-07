@@ -384,12 +384,13 @@ async def analyze_case_file(
     if not elements and motor != 'hechos':
         raise ValueError(f'El delito {offense_id} no tiene elementos jurídicos configurados.')
 
-    facts = facts or await _clasificar_hechos(narrative)
-
     if motor == 'hechos':
+        facts = facts or await _clasificar_hechos(narrative)
         return {'facts': facts}
 
     legal_context = await search_legal_articles(query=narrative, offense_id=offense_id, limit=5, as_of_date=fact_date)
+
+    facts = facts or await _clasificar_hechos(narrative)
 
     elements_analysis = elements_analysis or await _analizar_elementos(
         narrative, offense_name, offense_id, elements, legal_context, legal_articles, facts

@@ -123,6 +123,7 @@ services:
 
       QDRANT_URL: http://qdrant:6333
       OLLAMA_URL: http://ollama:11434
+      MPIA_ALLOW_MISSING_LEGAL_ARTICLES: "true"
 
     ports:
       - "8001:8000"

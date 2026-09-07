@@ -327,6 +327,7 @@ services:
 
       FILESYSTEM_DISK: local
       MPIA_ENGINE_URL: http://ai-service:8000
+      DB_QUEUE_RETRY_AFTER: 2000
 
     depends_on:
       postgres:
@@ -348,7 +349,7 @@ services:
       - --queue=default
       - --sleep=5
       - --tries=3
-      - --timeout=300
+      - --timeout=1900
       - --backoff=10
       - --memory=512
 

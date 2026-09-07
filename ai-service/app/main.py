@@ -61,6 +61,15 @@ async def analyze_case(payload: AnalysisRequest):
         return {"status": "success", "data": result}
     except HTTPException:
         raise
+    except RuntimeError as exception:
+        if str(exception).startswith('No hay artículos jurídicos'):
+            raise HTTPException(status_code=422, detail={'message': str(exception), 'error': str(exception)}) from exception
+
+        logger.exception('Error de dependencias analizando la carpeta %s', payload.external_case_id)
+        raise HTTPException(
+            status_code=503,
+            detail={'message': 'Una dependencia del análisis no está disponible.', 'error': str(exception)},
+        ) from exception
     except Exception as exception:
         logger.exception('Error analizando la carpeta %s', payload.external_case_id)
         raise HTTPException(
