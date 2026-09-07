@@ -61,6 +61,7 @@ class LesionesArticlesSeeder extends Seeder
                 'content' => 'Comete el delito de lesiones, el que infiera a otro un daño que deje en '
                     .'su cuerpo un vestigio o altere su salud física o mental.',
                 'display_order' => 1,
+                'is_verified' => true,
             ]
         );
 

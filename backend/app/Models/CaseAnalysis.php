@@ -19,6 +19,10 @@ class CaseAnalysis extends Model
         'objectivity_audit',
         'suggested_diligences',
         'motor_status',
+        'source_snapshot',
+        'source_hash',
+        'source_changed_at',
+        'requires_reanalysis',
         'status',
         'error_message',
     ];
@@ -32,6 +36,9 @@ class CaseAnalysis extends Model
         'external_offense_id' => 'integer',
         'user_id' => 'integer',
         'fact_date' => 'date',
+        'source_snapshot' => 'array',
+        'source_changed_at' => 'datetime',
+        'requires_reanalysis' => 'boolean',
     ];
 
     public function user()

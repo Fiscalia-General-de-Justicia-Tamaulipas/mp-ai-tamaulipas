@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ProcessCaseAnalysisJob;
 use App\Http\Requests\UpdateCaseAnalysisRequest;
+use App\Jobs\ProcessCaseAnalysisJob;
 use App\Models\CaseAnalysis;
 use App\Repositories\CaseRepository;
 use App\Services\CaseAnalysisAuditService;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -28,7 +28,7 @@ class CaseAnalysisController extends Controller
         $search = $request->string('search')->trim()->toString();
 
         $analysesQuery = CaseAnalysis::query()
-            ->where('user_id', Auth::id() ?? 1)
+            ->where('user_id', Auth::id())
             ->when($status && in_array($status, ['draft', 'reviewed', 'approved', 'rejected'], true), function (Builder $query) use ($status): void {
                 $query->where('status', $status);
             })
@@ -46,7 +46,7 @@ class CaseAnalysisController extends Controller
             'updated_at',
         ]);
 
-        $baseQuery = CaseAnalysis::where('user_id', Auth::id() ?? 1);
+        $baseQuery = CaseAnalysis::where('user_id', Auth::id());
 
         return Inertia::render('CaseAnalysis/Index', [
             'analyses' => $analyses,
@@ -66,12 +66,54 @@ class CaseAnalysisController extends Controller
     public function show(int $id): Response
     {
         $analysis = CaseAnalysis::with(['evidence', 'facts', 'hypotheses', 'audits.user'])
-            ->where('user_id', Auth::id() ?? 1)
+            ->where('user_id', Auth::id())
             ->findOrFail($id);
+
+        $caseData = $this->caseDataForAnalysis($analysis);
 
         return Inertia::render('CaseAnalysis/Show', [
             'analysis' => $analysis,
+            'caseData' => $caseData,
         ]);
+    }
+
+    private function caseDataForAnalysis(CaseAnalysis $analysis): array
+    {
+        [$expediente, $idCarpeta] = $this->splitExternalCaseId($analysis->external_case_id);
+        $caseData = $this->caseRepository->findByIdCarpeta($expediente, $idCarpeta);
+
+        if ($caseData) {
+            return $caseData;
+        }
+
+        $factsBreakdown = $analysis->facts_breakdown ?? [];
+
+        return [
+            'EXPEDIENTE' => $expediente ?: $analysis->external_case_id,
+            'ID_CARPETA' => $idCarpeta ?: 'N/D',
+            'TIPO' => 'Carpeta',
+            'DELITO' => null,
+            'MODALIDAD' => null,
+            'ESTADO' => 'No disponible en la fuente externa',
+            'UNIDAD' => 'No disponible en la fuente externa',
+            'MUNICIPIO' => 'No disponible en la fuente externa',
+            'FECHA_HECHO' => optional($analysis->fact_date)->toDateString(),
+            'DESCRIPCION_HECHOS' => $factsBreakdown['narrative'] ?? '',
+        ];
+    }
+
+    private function splitExternalCaseId(string $externalCaseId): array
+    {
+        $separatorPosition = strrpos($externalCaseId, '-');
+
+        if ($separatorPosition === false) {
+            return [$externalCaseId, ''];
+        }
+
+        return [
+            substr($externalCaseId, 0, $separatorPosition),
+            substr($externalCaseId, $separatorPosition + 1),
+        ];
     }
 
     public function store(Request $request): JsonResponse
@@ -86,7 +128,7 @@ class CaseAnalysisController extends Controller
         $analysis = CaseAnalysis::create([
             'external_case_id' => $validated['external_case_id'],
             'external_offense_id' => $validated['external_offense_id'],
-            'user_id' => Auth::id() ?? 1,
+            'user_id' => Auth::id(),
             'fact_date' => $validated['fact_date'] ?? null,
             'facts_breakdown' => ['narrative' => $validated['fact_narrative']],
             'status' => 'draft',
@@ -107,7 +149,7 @@ class CaseAnalysisController extends Controller
         $validated = $request->validated();
 
         $analysis = CaseAnalysis::with('evidence')
-            ->where('user_id', Auth::id() ?? 1)
+            ->where('user_id', Auth::id())
             ->findOrFail($id);
 
         $before = [
@@ -135,7 +177,7 @@ class CaseAnalysisController extends Controller
                 'procedural_relation' => $evidence['procedural_relation'],
                 'origin' => 'usuario',
                 'is_verified' => true,
-                'reviewed_by' => Auth::id() ?? $analysis->user_id ?? 1,
+                'reviewed_by' => Auth::id() ?? $analysis->user_id,
                 'reviewed_at' => now(),
             ]);
         }

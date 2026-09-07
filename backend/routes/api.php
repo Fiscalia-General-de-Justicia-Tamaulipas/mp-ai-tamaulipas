@@ -3,7 +3,7 @@
 use App\Http\Controllers\CaseAnalysisController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->group(function () {
+Route::middleware('auth')->prefix('v1')->group(function () {
     Route::post('/cases/analyze', [CaseAnalysisController::class, 'store'])
         ->name('api.case-analysis.store');
 

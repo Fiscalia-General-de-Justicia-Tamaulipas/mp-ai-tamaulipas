@@ -5,13 +5,13 @@ namespace App\Services;
 use App\Models\LegalArticle;
 use App\Models\Ms\Crime;
 use App\Models\OffenseElement;
-use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class CaseAnalysisService
 {
-    public function runAnalysis(string $externalCaseId, int $externalOffenseId, string $narrative, ?Carbon $factDate = null): array
+    public function runAnalysis(string $externalCaseId, int $externalOffenseId, string $narrative, ?CarbonInterface $factDate = null): array
     {
         return $this->runMotor($externalCaseId, $externalOffenseId, $narrative, 'completo', [], [], $factDate);
     }
@@ -23,9 +23,8 @@ class CaseAnalysisService
         string $motor,
         array $facts = [],
         array $elementsAnalysis = [],
-        ?Carbon $factDate = null
-    ): array
-    {
+        ?CarbonInterface $factDate = null
+    ): array {
         $baseUrl = config('services.mpia_engine.url');
 
         if (empty($baseUrl)) {

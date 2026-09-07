@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Jobs\ProcessCaseAnalysisJob;
 use App\Models\CaseAnalysis;
 use App\Models\CaseEvidence;
+use App\Models\User;
 use App\Services\CaseAnalysisService;
+use App\Services\HypothesisEngine;
+use App\Services\ObjectivityAuditEngine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -14,9 +17,21 @@ class CaseAnalysisApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_guests_cannot_create_a_case_analysis_via_the_api(): void
+    {
+        $response = $this->postJson('/api/v1/cases/analyze', [
+            'external_case_id' => 'EXP-123',
+            'external_offense_id' => 42,
+            'fact_narrative' => 'Los hechos ocurrieron en la zona urbana y el imputado fue identificado por testigos.',
+        ]);
+
+        $response->assertUnauthorized();
+    }
+
     public function test_users_can_create_a_case_analysis_via_the_api(): void
     {
         Queue::fake();
+        $this->actingAs(User::factory()->create());
 
         $response = $this->postJson('/api/v1/cases/analyze', [
             'external_case_id' => 'EXP-123',
@@ -33,6 +48,49 @@ class CaseAnalysisApiTest extends TestCase
             ]);
 
         Queue::assertPushed(ProcessCaseAnalysisJob::class);
+    }
+
+    public function test_users_cannot_view_another_users_case_analysis(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $analysis = CaseAnalysis::create([
+            'external_case_id' => 'EXP-999',
+            'external_offense_id' => 42,
+            'user_id' => $owner->id,
+            'status' => 'reviewed',
+        ]);
+
+        $response = $this->actingAs($otherUser)
+            ->get('/api/v1/cases/'.$analysis->id);
+
+        $response->assertNotFound();
+    }
+
+    public function test_users_cannot_update_another_users_case_analysis(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $analysis = CaseAnalysis::create([
+            'external_case_id' => 'EXP-998',
+            'external_offense_id' => 42,
+            'user_id' => $owner->id,
+            'status' => 'reviewed',
+        ]);
+
+        $response = $this->actingAs($otherUser)
+            ->put('/api/v1/cases/'.$analysis->id, [
+                'elements_status' => [],
+                'suggested_diligences' => [],
+                'status' => 'approved',
+            ]);
+
+        $response->assertNotFound();
+        $this->assertDatabaseHas('case_analyses', [
+            'id' => $analysis->id,
+            'user_id' => $owner->id,
+            'status' => 'reviewed',
+        ]);
     }
 
     public function test_analysis_results_are_persisted_as_structured_evidence(): void
@@ -56,7 +114,11 @@ class CaseAnalysisApiTest extends TestCase
             'suggested_diligences' => [],
         ]);
 
-        (new ProcessCaseAnalysisJob($analysis, 'Una persona tomó el objeto.'))->handle($service);
+        (new ProcessCaseAnalysisJob($analysis, 'Una persona tomó el objeto.'))->handle(
+            $service,
+            app(HypothesisEngine::class),
+            app(ObjectivityAuditEngine::class),
+        );
 
         $this->assertDatabaseHas('case_evidence', [
             'case_analysis_id' => $analysis->id,
@@ -96,7 +158,11 @@ class CaseAnalysisApiTest extends TestCase
             'suggested_diligences' => [],
         ]);
 
-        (new ProcessCaseAnalysisJob($analysis, 'Nueva narrativa.'))->handle($service);
+        (new ProcessCaseAnalysisJob($analysis, 'Nueva narrativa.'))->handle(
+            $service,
+            app(HypothesisEngine::class),
+            app(ObjectivityAuditEngine::class),
+        );
 
         $this->assertDatabaseHas('case_evidence', [
             'case_analysis_id' => $analysis->id,
@@ -130,7 +196,11 @@ class CaseAnalysisApiTest extends TestCase
             'suggested_diligences' => [],
         ]);
 
-        (new ProcessCaseAnalysisJob($analysis, 'Narrativa.'))->handle($service);
+        (new ProcessCaseAnalysisJob($analysis, 'Narrativa.'))->handle(
+            $service,
+            app(HypothesisEngine::class),
+            app(ObjectivityAuditEngine::class),
+        );
 
         $this->assertDatabaseCount('case_evidence', 1);
         $this->assertDatabaseCount('case_facts', 1);

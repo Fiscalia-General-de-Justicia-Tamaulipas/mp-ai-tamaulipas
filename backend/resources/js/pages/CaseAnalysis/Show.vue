@@ -41,6 +41,7 @@ const hasProcessingMotors = computed(() => Object.values(motorStatus.value).some
 const isAnalysisProcessing = computed(() => currentAnalysis.value?.status === 'draft' && Object.keys(motorStatus.value).length === 0);
 const hasServerProcessing = computed(() => isAnalysisProcessing.value || hasProcessingMotors.value);
 const isProcessing = computed(() => hasServerProcessing.value || requestedMotor.value !== null);
+const sourceChanged = computed(() => Boolean(currentAnalysis.value?.requires_reanalysis));
 const statusLabel = computed(() => isProcessing.value ? 'Motor en ejecución' : 'Motores disponibles');
 const hasObjectiveResults = computed(() => Boolean(currentAnalysis.value?.objectivity_audit) || diligences.value.length > 0);
 const hasLegalFoundation = computed(() => facts.value.length > 0 && elements.value.length > 0);
@@ -102,7 +103,7 @@ const startPolling = () => {
 };
 
 const runMotor = (motor) => {
-    if (isProcessing.value) {
+    if (isProcessing.value || sourceChanged.value) {
         return;
     }
 
@@ -119,6 +120,15 @@ const runMotor = (motor) => {
         onError: () => {
             requestedMotor.value = null;
         },
+    });
+};
+
+const reanalyzeCase = () => {
+    router.post(route('cases.analyze'), {
+        expediente: props.caseData?.EXPEDIENTE || '',
+        id_carpeta: props.caseData?.ID_CARPETA || '',
+    }, {
+        preserveScroll: true,
     });
 };
 
@@ -140,7 +150,7 @@ const saveHumanReview = () => {
         suggested_diligences: diligences.value,
         evidence: evidence.value,
         status: 'reviewed',
-        review_note: reviewNote.value || null,
+        review_note: reviewNote.value.trim() || null,
     }, {
         onFinish: () => {
             isSaving.value = false;
@@ -228,7 +238,7 @@ watch(currentAnalysis, syncReview);
                         <div><dt>Estado</dt><dd>{{ caseData?.ESTADO || 'No disponible' }}</dd></div>
                         <div><dt>Unidad</dt><dd>{{ caseData?.UNIDAD || 'No disponible' }}</dd></div>
                         <div><dt>Municipio</dt><dd>{{ caseData?.MUNICIPIO || 'No disponible' }}</dd></div>
-                        <div><dt>Fecha del hecho</dt><dd>{{ formatFactDate(currentAnalysis?.fact_date || caseData?.FECHA_HECHO) }}</dd></div>
+                        <div><dt>Fecha del hecho</dt><dd>{{ formatFactDate(caseData?.FECHA_HECHO || currentAnalysis?.fact_date) }}</dd></div>
                     </dl>
                 </div>
                 <div class="case-header__action">
@@ -241,6 +251,15 @@ watch(currentAnalysis, syncReview);
             </header>
 
             <p class="decision-disclaimer"><AlertCircle class="size-4 shrink-0" />Este resultado es una herramienta de apoyo y no constituye una determinación ministerial.</p>
+
+            <div v-if="sourceChanged" class="request-error source-change-alert">
+                <AlertCircle class="size-5 shrink-0" />
+                <div>
+                    <strong>La carpeta fue actualizada en la fuente externa</strong>
+                    <p>El resultado mostrado corresponde a una versión anterior de los hechos. Revisa los cambios y vuelve a ejecutar el análisis antes de continuar con los motores.</p>
+                    <button type="button" class="module-action" :disabled="isProcessing" @click="reanalyzeCase">Volver a analizar la carpeta</button>
+                </div>
+            </div>
 
             <div v-if="form.errors.analysis || form.errors.expediente || form.errors.motor" class="request-error">
                 <AlertCircle class="size-5 shrink-0" />
@@ -542,10 +561,10 @@ watch(currentAnalysis, syncReview);
 .institutional-module--hypothesis .hypothesis-summary { margin: 0; border: 0; border-radius: 0; background: #fffdf8; }.institutional-module--evidence .institutional-panel { padding-top: 22px; }.institutional-final { margin-top: 0; }
 .institutional-module--evidence .module-loading { display: flex; min-height: 100px; border-style: solid; background: #f8fbf9; color: #81938c; }.institutional-module--evidence .module-loading > svg, .institutional-module--evidence .module-loading > div { display: none; }.institutional-module--evidence .module-loading::after { content: 'Pendiente del análisis jurídico'; font-size: 12px; font-weight: 700; }
 @media (max-width: 820px) { .institutional-results__header, .institutional-module__header { align-items: flex-start; flex-direction: column; }.module-action { width: 100%; }.institutional-module__grid--legal, .institutional-module__grid--objectivity { grid-template-columns: 1fr; } }
-.case-header { align-items: start; padding: 25px 30px; }.case-header__content { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; }.case-header__content .eyebrow, .case-header__content h1 { grid-column: 1 / -1; }.case-header__content h1 { margin: 8px 0 12px; }.case-header__meta { align-self: center; }.case-header__details { grid-template-columns: repeat(4, minmax(100px, 1fr)); gap: 14px; max-width: none; margin: 0; padding: 0 0 0 20px; border-top: 0; border-left: 1px solid rgba(181, 203, 197, .2); }
-@media (max-width: 680px) { .case-header { padding: 23px 22px; }.case-header__content { display: block; width: 100%; }.case-header__details { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; padding: 14px 0 0; border-top: 1px solid rgba(181, 203, 197, .2); border-left: 0; }.case-header__action { width: 100%; margin-top: 18px; align-items: flex-start; } }
+.case-header { align-items: start; padding: 25px 30px; }.case-header__content { display: block; min-width: 0; }.case-header__content h1 { margin: 8px 0 12px; }.case-header__meta { align-items: flex-start; gap: 8px 14px; min-width: 0; line-height: 1.35; }.case-header__meta > span:not(.case-chip) { min-width: 0; max-width: min(100%, 360px); overflow-wrap: anywhere; }.case-header__details { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; max-width: none; margin: 20px 0 0; padding: 14px 16px; border: 1px solid rgba(123, 221, 185, .18); border-radius: 10px; background: rgba(255, 255, 255, .045); }.case-header__details dd { overflow-wrap: anywhere; white-space: normal; }
+@media (max-width: 680px) { .case-header { padding: 23px 22px; }.case-header__content { display: block; width: 100%; }.case-header__meta { display: grid; grid-template-columns: 1fr; gap: 8px; }.case-header__meta > span:not(.case-chip) { max-width: none; }.case-header__details { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px; padding: 14px; border-top: 1px solid rgba(181, 203, 197, .2); border-left: 0; }.case-header__action { width: 100%; margin-top: 18px; align-items: flex-start; } }
 @media (max-width: 520px) { .case-header__details { grid-template-columns: 1fr; gap: 9px; } }
-.case-header__content { min-width: 0; }.case-header__action { padding-top: 1px; }.case-header__details { padding: 12px 16px; border: 1px solid rgba(123, 221, 185, .18); border-radius: 10px; background: rgba(255, 255, 255, .045); }.case-header__details dd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.case-header__content { min-width: 0; }.case-header__action { padding-top: 1px; }.case-header__details { padding: 12px 16px; border: 1px solid rgba(123, 221, 185, .18); border-radius: 10px; background: rgba(255, 255, 255, .045); }.case-header__details dd { min-width: 0; overflow-wrap: anywhere; }
 .overview-card--narrative { border-top: 3px solid #69d9ae; }.narrative-text { max-height: 220px; overflow-y: auto; scrollbar-color: #b8dacc transparent; }
 .institutional-module__header { background: linear-gradient(90deg, #fbfdfc 0%, #f5faf7 100%); }.institutional-module__header h2 { font-size: 21px; }.institutional-module__number { box-shadow: 0 0 0 5px rgba(232, 246, 239, .75); }.module-action { min-height: 38px; box-shadow: 0 4px 10px rgba(22, 137, 101, .16); }.module-action:focus-visible, .motor-button:focus-visible, .save-button:focus-visible { outline: 3px solid rgba(103, 224, 180, .35); outline-offset: 2px; }
 .module-action-wrap { display: grid; justify-items: end; gap: 7px; }.module-dependency { color: #a4731d; font-size: 10px; font-weight: 700; text-align: right; }.module-action:disabled { box-shadow: none; }
@@ -558,7 +577,7 @@ watch(currentAnalysis, syncReview);
 .institutional-module--objectivity .module-loading { border-color: #c8dfe7; background: linear-gradient(135deg, #f8fcfd 0%, #eef8fb 50%, #f8fcfd 100%); }.institutional-module--objectivity .module-loading--compact > svg { border-color: #afd3df; background: #eaf6fa; color: #287fa1; }.institutional-module--hypothesis .module-loading { border-color: #e7d7af; background: linear-gradient(135deg, #fffdf8 0%, #fff8e9 50%, #fffdf8 100%); }.institutional-module--hypothesis .module-loading--compact > svg { border-color: #e5ca8d; background: #fff7e7; color: #a4731d; }
 .institutional-module--evidence .module-loading { min-height: 108px; border-style: solid; background: #f8fbf9; }.institutional-module--evidence .module-loading::before { display: none; }.institutional-module--evidence .module-loading::after { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; border: 1px solid #d5e7df; border-radius: 7px; background: #fff; color: #71837d; font-size: 11px; font-weight: 800; content: 'Pendiente del análisis jurídico'; }
 @keyframes loading-sheen { 0% { transform: translateX(0); } 65%, 100% { transform: translateX(480%); } } @keyframes loading-pulse { 0%, 100% { width: 34px; opacity: .45; } 50% { width: 76px; opacity: 1; } }
-.legal-summary-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; padding: 1px; background: #dce7e2; }.legal-summary-strip div { display: grid; gap: 3px; padding: 14px 18px; background: #f8fbf9; }.legal-summary-strip strong { color: #173a30; font-size: 22px; line-height: 1; }.legal-summary-strip span { color: #71837d; font-size: 10px; font-weight: 800; text-transform: uppercase; }.legal-foundation-flow { display: grid; grid-template-columns: minmax(0, .9fr) 58px minmax(0, 1.3fr); align-items: stretch; gap: 0; padding: 1px; background: #dce7e2; }.legal-foundation-flow .institutional-panel { min-height: 100%; }.legal-facts-panel { background: #fafdff; }.legal-matrix-panel { background: #fff; }.institutional-panel__heading small { display: block; margin-top: 5px; color: #8a9a94; font-size: 10px; line-height: 1.4; }.legal-flow-divider { display: grid; place-items: center; align-content: center; gap: 9px; background: #f4f8f6; color: #7a9087; }.legal-flow-divider span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 9px; font-weight: 900; letter-spacing: .13em; }.legal-flow-divider b { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid #b9d9ca; border-radius: 50%; background: #eaf7ef; color: #168965; font-size: 14px; }.fact-item__heading { flex-wrap: wrap; }.fact-id { color: #168965; font-size: 10px; font-weight: 900; letter-spacing: .06em; }.fact-link { display: inline-block; margin: 9px 0 0; padding: 3px 6px; border-radius: 4px; background: #edf8f2; color: #168965; font-size: 10px; font-weight: 800; }.legal-matrix-panel .element-list { max-height: 620px; padding-right: 4px; }.legal-matrix-panel .element-item { padding: 14px; }.legal-matrix-panel .element-actions { margin-top: 11px; }
+.legal-summary-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; padding: 1px; background: #dce7e2; }.legal-summary-strip div { display: grid; gap: 3px; padding: 14px 18px; background: #f8fbf9; }.legal-summary-strip strong { color: #173a30; font-size: 22px; line-height: 1; }.legal-summary-strip span { color: #71837d; font-size: 10px; font-weight: 800; text-transform: uppercase; }.legal-foundation-flow { display: grid; grid-template-columns: minmax(0, .9fr) 58px minmax(0, 1.3fr); align-items: stretch; gap: 0; padding: 1px; background: #dce7e2; }.legal-foundation-flow .institutional-panel { min-height: 100%; }.legal-facts-panel { background: #fafdff; }.legal-matrix-panel { background: #fff; }.institutional-panel__heading small { display: block; margin-top: 5px; color: #8a9a94; font-size: 10px; line-height: 1.4; }.legal-flow-divider { display: grid; place-items: center; align-content: center; gap: 9px; background: #f4f8f6; color: #7a9087; }.legal-flow-divider span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 9px; font-weight: 900; letter-spacing: .13em; }.legal-flow-divider b { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid #b9d9ca; border-radius: 50%; background: #eaf7ef; color: #168965; font-size: 14px; }.fact-item__heading { flex-wrap: wrap; }.fact-id { color: #168965; font-size: 10px; font-weight: 900; letter-spacing: .06em; }.fact-link { display: inline-block; margin: 9px 0 0; padding: 3px 6px; border-radius: 4px; background: #edf8f2; color: #168965; font-size: 10px; font-weight: 800; }.legal-facts-panel .facts-list, .legal-matrix-panel .element-list { max-height: 620px; overflow-y: auto; align-content: start; padding: 2px 7px 4px 0; scrollbar-color: #b7d8c8 transparent; scrollbar-width: thin; }.legal-matrix-panel .element-item { padding: 14px; }.legal-matrix-panel .element-actions { margin-top: 11px; }
 @media (max-width: 900px) { .legal-foundation-flow { grid-template-columns: 1fr; }.legal-flow-divider { min-height: 42px; grid-auto-flow: column; gap: 8px; }.legal-flow-divider span { writing-mode: initial; transform: none; }.legal-flow-divider b { transform: rotate(90deg); } }
 @media (max-width: 560px) { .legal-summary-strip { grid-template-columns: repeat(2, 1fr); }.legal-summary-strip div { padding: 12px 14px; }.legal-summary-strip strong { font-size: 19px; } }
 </style>

@@ -52,10 +52,14 @@ class CaseController extends Controller
 
         $latestAnalysis = CaseAnalysis::with(['evidence', 'facts', 'hypotheses', 'audits.user'])
             ->where('external_case_id', $externalCaseId)
-            ->where('user_id', Auth::id() ?? 1)
+            ->where('user_id', Auth::id())
             ->when($crime, fn ($query) => $query->where('external_offense_id', $crime->ID_DLTO))
             ->latest()
             ->first();
+
+        if ($latestAnalysis) {
+            $this->markSourceChangeIfNeeded($latestAnalysis, $caseData);
+        }
 
         return Inertia::render('CaseAnalysis/Show', [
             'caseData' => $caseData,
@@ -81,7 +85,7 @@ class CaseController extends Controller
         $factDate = $this->factDate($caseData);
 
         $activeAnalysis = CaseAnalysis::where('external_case_id', $externalCaseId)
-            ->where('user_id', Auth::id() ?? 1)
+            ->where('user_id', Auth::id())
             ->where('status', 'draft')
             ->latest()
             ->first();
@@ -99,9 +103,13 @@ class CaseController extends Controller
         $analysis = CaseAnalysis::create([
             'external_case_id' => $externalCaseId,
             'external_offense_id' => $crime->ID_DLTO,
-            'user_id' => Auth::id() ?? 1,
+            'user_id' => Auth::id(),
             'fact_date' => $factDate?->toDateString(),
             'facts_breakdown' => ['narrative' => $caseData['DESCRIPCION_HECHOS'] ?? ''],
+            'source_snapshot' => $this->sourceSnapshot($caseData),
+            'source_hash' => $this->sourceHash($caseData),
+            'source_changed_at' => null,
+            'requires_reanalysis' => false,
             'status' => 'draft',
             'error_message' => null,
         ]);
@@ -135,14 +143,21 @@ class CaseController extends Controller
             [
                 'external_case_id' => $externalCaseId,
                 'external_offense_id' => $crime->ID_DLTO,
-                'user_id' => Auth::id() ?? 1,
+                'user_id' => Auth::id(),
             ],
             [
                 'fact_date' => $factDate?->toDateString(),
                 'facts_breakdown' => ['narrative' => $caseData['DESCRIPCION_HECHOS'] ?? ''],
+                'source_snapshot' => $this->sourceSnapshot($caseData),
+                'source_hash' => $this->sourceHash($caseData),
+                'requires_reanalysis' => false,
                 'status' => 'draft',
             ]
         );
+
+        if ($this->markSourceChangeIfNeeded($analysis, $caseData)) {
+            return back()->withErrors(['motor' => 'La carpeta cambió en la fuente externa. Vuelve a ejecutar el análisis completo antes de continuar.']);
+        }
 
         if ($factDate && ! $analysis->fact_date) {
             $analysis->update([
@@ -203,5 +218,43 @@ class CaseController extends Controller
         }
 
         return Carbon::parse($value);
+    }
+
+    private function sourceSnapshot(array $caseData): array
+    {
+        return collect([
+            'EXPEDIENTE' => $caseData['EXPEDIENTE'] ?? null,
+            'ID_CARPETA' => $caseData['ID_CARPETA'] ?? null,
+            'DELITO' => $caseData['DELITO'] ?? null,
+            'MODALIDAD' => $caseData['MODALIDAD'] ?? null,
+            'ESTADO' => $caseData['ESTADO'] ?? null,
+            'UNIDAD' => $caseData['UNIDAD'] ?? null,
+            'MUNICIPIO' => $caseData['MUNICIPIO'] ?? null,
+            'FECHA_HECHO' => $caseData['FECHA_HECHO'] ?? null,
+            'DESCRIPCION_HECHOS' => $caseData['DESCRIPCION_HECHOS'] ?? null,
+        ])->map(fn ($value) => is_string($value) ? trim($value) : $value)->all();
+    }
+
+    private function sourceHash(array $caseData): string
+    {
+        return hash('sha256', json_encode($this->sourceSnapshot($caseData), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function markSourceChangeIfNeeded(CaseAnalysis $analysis, array $caseData): bool
+    {
+        $currentHash = $this->sourceHash($caseData);
+
+        if (blank($analysis->source_hash) || hash_equals($analysis->source_hash, $currentHash)) {
+            return false;
+        }
+
+        if (! $analysis->requires_reanalysis) {
+            $analysis->update([
+                'source_changed_at' => now(),
+                'requires_reanalysis' => true,
+            ]);
+        }
+
+        return true;
     }
 }

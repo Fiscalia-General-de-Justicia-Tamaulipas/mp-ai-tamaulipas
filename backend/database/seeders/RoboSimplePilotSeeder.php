@@ -53,6 +53,7 @@ class RoboSimplePilotSeeder extends Seeder
                 'fraction' => null,
                 'content' => 'Comete el delito de robo, el que se apodera de una cosa mueble ajena.',
                 'display_order' => 1,
+                'is_verified' => true,
             ],
             [
                 'article_number' => '402',
@@ -62,6 +63,7 @@ class RoboSimplePilotSeeder extends Seeder
                     .'prisión y multa de cinco a cuarenta veces el valor diario de la Unidad de Medida y '
                     .'Actualización.',
                 'display_order' => 2,
+                'is_verified' => true,
             ],
             [
                 'article_number' => '402',
@@ -70,6 +72,7 @@ class RoboSimplePilotSeeder extends Seeder
                     .'en una fuente oficial confiable durante esta carga. Consultar el Periódico Oficial o el '
                     .'documento de consulta del Congreso de Tamaulipas antes de usar este artículo en producción.]',
                 'display_order' => 3,
+                'is_verified' => false,
             ],
             [
                 'article_number' => '402',
@@ -79,6 +82,7 @@ class RoboSimplePilotSeeder extends Seeder
                     .'y multa de ochenta a ciento cuarenta veces el valor diario de la Unidad de Medida y '
                     .'Actualización;',
                 'display_order' => 4,
+                'is_verified' => true,
             ],
             [
                 'article_number' => '402',
@@ -88,6 +92,7 @@ class RoboSimplePilotSeeder extends Seeder
                     .'prisión y multa de ciento cuarenta a ciento ochenta veces el valor diario de la Unidad '
                     .'de Medida y Actualización.',
                 'display_order' => 5,
+                'is_verified' => true,
             ],
         ];
 

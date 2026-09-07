@@ -167,7 +167,11 @@ class ProcessCaseMotorJob implements ShouldQueue
         ];
         $this->analysis->update([
             'motor_status' => $motorStatus,
-            'status' => $status === 'draft' ? 'draft' : 'reviewed',
+            'status' => match ($status) {
+                'draft' => 'draft',
+                'failed' => 'rejected',
+                default => 'reviewed',
+            },
             'error_message' => $error,
         ]);
     }
