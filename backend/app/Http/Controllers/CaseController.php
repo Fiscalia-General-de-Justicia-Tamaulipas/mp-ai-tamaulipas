@@ -64,6 +64,9 @@ class CaseController extends Controller
         return Inertia::render('CaseAnalysis/Show', [
             'caseData' => $caseData,
             'latestAnalysis' => $latestAnalysis,
+            'sourceChanges' => $latestAnalysis
+                ? $this->sourceChanges($latestAnalysis, $caseData)
+                : [],
         ]);
     }
 
@@ -256,5 +259,37 @@ class CaseController extends Controller
         }
 
         return true;
+    }
+
+    private function sourceChanges(CaseAnalysis $analysis, array $caseData): array
+    {
+        $previous = $analysis->source_snapshot ?? [];
+        $current = $this->sourceSnapshot($caseData);
+        $labels = [
+            'DELITO' => 'Delito',
+            'MODALIDAD' => 'Modalidad',
+            'ESTADO' => 'Estado de la carpeta',
+            'UNIDAD' => 'Unidad',
+            'MUNICIPIO' => 'Municipio',
+            'FECHA_HECHO' => 'Fecha del hecho',
+            'DESCRIPCION_HECHOS' => 'Descripción de los hechos',
+        ];
+
+        return collect($labels)
+            ->filter(function (string $label, string $key) use ($previous, $current): bool {
+                return $this->normalizedSourceValue($previous[$key] ?? null)
+                    !== $this->normalizedSourceValue($current[$key] ?? null);
+            })
+            ->map(fn (string $label, string $key): array => [
+                'field' => $key,
+                'label' => $label,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function normalizedSourceValue(mixed $value): string
+    {
+        return mb_strtolower(trim((string) $value));
     }
 }

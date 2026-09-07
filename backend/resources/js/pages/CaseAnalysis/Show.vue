@@ -18,6 +18,7 @@ const props = defineProps({
     analysis: { type: Object, default: null },
     caseData: { type: Object, default: null },
     latestAnalysis: { type: Object, default: null },
+    sourceChanges: { type: Array, default: () => [] },
 });
 
 const currentAnalysis = computed(() => props.latestAnalysis || props.analysis);
@@ -257,6 +258,9 @@ watch(currentAnalysis, syncReview);
                 <div>
                     <strong>La carpeta fue actualizada en la fuente externa</strong>
                     <p>El resultado mostrado corresponde a una versión anterior de los hechos. Revisa los cambios y vuelve a ejecutar el análisis antes de continuar con los motores.</p>
+                    <ul v-if="sourceChanges.length" class="source-change-list">
+                        <li v-for="change in sourceChanges" :key="change.field">{{ change.label }}</li>
+                    </ul>
                     <button type="button" class="module-action" :disabled="isProcessing" @click="reanalyzeCase">Volver a analizar la carpeta</button>
                 </div>
             </div>
@@ -493,6 +497,7 @@ watch(currentAnalysis, syncReview);
 .primary-button:disabled, .save-button:disabled { cursor: wait; opacity: .6; }
 .request-error { display: flex; gap: 12px; margin-top: 18px; padding: 15px 18px; border: 1px solid #f2c2bc; border-radius: 12px; background: #fff2f0; color: #8e3026; }
 .request-error strong { font-size: 13px; }.request-error p { margin-top: 3px; font-size: 13px; }
+.source-change-alert > div { min-width: 0; }.source-change-list { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 12px; padding: 0; list-style: none; }.source-change-list li { position: relative; padding-left: 12px; color: #7b4038; font-size: 12px; font-weight: 700; }.source-change-list li::before { position: absolute; top: .55em; left: 0; width: 5px; height: 5px; border-radius: 50%; background: #c86b5d; content: ''; }
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(260px, .75fr); gap: 18px; margin-top: 18px; }
 .overview-card, .result-card { border: 1px solid #dce7e2; border-radius: 16px; background: #fff; box-shadow: 0 7px 20px rgba(36, 69, 60, .045); }
 .overview-card { padding: 25px; }.section-heading { gap: 12px; }.section-heading p, .card-kicker, .state-kicker { margin: 0 0 4px; color: #168965; font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }.section-heading h2, .result-card h3 { margin: 0; font-size: 17px; letter-spacing: -.02em; }.icon-box { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 11px; }.icon-box--green { background: #e5f8ef; color: #11855d; }.icon-box--slate { background: #edf2f1; color: #526661; }
