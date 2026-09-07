@@ -43,6 +43,7 @@ const isAnalysisProcessing = computed(() => currentAnalysis.value?.status === 'd
 const hasServerProcessing = computed(() => isAnalysisProcessing.value || hasProcessingMotors.value);
 const isProcessing = computed(() => hasServerProcessing.value || requestedMotor.value !== null);
 const sourceChanged = computed(() => Boolean(currentAnalysis.value?.requires_reanalysis));
+const analysisError = computed(() => currentAnalysis.value?.error_message || 'No fue posible completar el análisis.');
 const statusLabel = computed(() => isProcessing.value ? 'Motor en ejecución' : 'Motores disponibles');
 const hasObjectiveResults = computed(() => Boolean(currentAnalysis.value?.objectivity_audit) || diligences.value.length > 0);
 const hasLegalFoundation = computed(() => facts.value.length > 0 && elements.value.length > 0);
@@ -270,6 +271,14 @@ watch(currentAnalysis, syncReview);
                 <div>
                     <strong>No se pudo ejecutar el motor</strong>
                     <p>{{ form.errors.analysis || form.errors.expediente || form.errors.motor }}</p>
+                </div>
+            </div>
+
+            <div v-if="currentAnalysis?.status === 'rejected' && currentAnalysis?.error_message" class="request-error">
+                <AlertCircle class="size-5 shrink-0" />
+                <div>
+                    <strong>El análisis terminó con error</strong>
+                    <p>{{ analysisError }}</p>
                 </div>
             </div>
 

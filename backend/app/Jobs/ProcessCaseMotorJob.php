@@ -82,6 +82,8 @@ class ProcessCaseMotorJob implements ShouldQueue
             $this->markMotor('completed');
         } catch (Throwable $exception) {
             $this->markMotor('failed', $exception->getMessage());
+
+            throw $exception;
         }
     }
 
